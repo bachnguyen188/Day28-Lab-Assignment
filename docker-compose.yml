@@ -15,16 +15,20 @@ services:
     depends_on: [zookeeper]
     ports:
       - "9092:9092"
+      - "9093:9093"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9093,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9093,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   # ── Prefect ───────────────────────────────────────────────
   prefect-orion:
     image: prefecthq/prefect:2.14.0-python3.10
-    command: prefect orion start --host 0.0.0.0
+    command: prefect server start --host 0.0.0.0
     ports:
       - "4200:4200"
     volumes:
@@ -33,6 +37,7 @@ services:
   prefect-worker:
     image: prefecthq/prefect:2.14.0-python3.10
     command: prefect worker start -p docker -n lab28-worker
+    restart: on-failure
     environment:
       PREFECT_API_URL: http://prefect-orion:4200/api
     volumes:
@@ -70,17 +75,25 @@ services:
       - "3000:3000"
     environment:
       GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
 
   # ── API Gateway ───────────────────────────────────────────
   api-gateway:
     build: ./api-gateway
+    restart: on-failure
     ports:
       - "8000:8000"
     environment:
       VLLM_URL: ${VLLM_NGROK_URL}
       QDRANT_URL: http://qdrant:6333
       REDIS_URL: redis://redis:6379
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on: [qdrant, redis]
+
 
 volumes:
   prefect_data:

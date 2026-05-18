@@ -3,6 +3,9 @@ import requests
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 EMBED_URL = os.environ["EMBED_NGROK_URL"]
 qdrant = QdrantClient(host="localhost", port=6333)
@@ -15,7 +18,7 @@ qdrant.recreate_collection(
 
 def embed_and_store(records: list[dict]):
     # Gọi Kaggle embedding service
-    response = requests.post(f"{EMBED_URL}/embed", json={"texts": [r["text"] for r in records]})
+    response = requests.post(f"{EMBED_URL}/embed", json={"texts": [r["text"] for r in records]}, headers={"ngrok-skip-browser-warning": "any"})
     embeddings = response.json()["embeddings"]
 
     points = [
